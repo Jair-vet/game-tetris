@@ -1,0 +1,103 @@
+name: Claude Issue Analyzer
+
+on:
+  issues:
+    types: [opened, edited]
+
+jobs:
+  analyze-issue:
+    if: |
+      github.event.issue.state == 'open' &&
+      github.actor != 'github-actions[bot]' &&
+      github.actor != 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+      id-token: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Analyze issue and assign labels
+        id: claude-analyzer
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          claude_args: '--allowed-tools Bash(gh issue edit:*) Bash(gh issue comment:*) Bash(gh label create:*) Bash(gh label list:*)'
+          prompt: |
+            Eres un analizador automático de issues para un repositorio de juego Tetris.
+
+            ## Contexto del repositorio
+            Este es un juego Tetris implementado en HTML/CSS/JavaScript puro (sin frameworks, sin bundler).
+            Archivos principales:
+            - game.js (~305 líneas): toda la lógica del juego. Funciones clave: init(), spawn(), loop(),
+              rotateCW(), tryRotate(), clearLines(), ghostY(). Constantes: COLS=10, ROWS=20, BLOCK=30px.
+              Scoring: LINE_SCORES[cleared] * level. Drop speed: Math.max(100, 1000-(level-1)*90) ms.
+            - index.html: canvas #board (300x600px), canvas #next-canvas (120x120px), HUD (#score, #lines, #level), #overlay
+            - style.css: tema oscuro/retro, flexbox, backdrop-filter en overlays
+
+            ## Issue a analizar
+            - Número: #${{ github.event.issue.number }}
+            - Título: ${{ github.event.issue.title }}
+            - Autor: ${{ github.event.issue.user.login }}
+            - Body:
+            ${{ github.event.issue.body }}
+
+            ## Tu tarea — ejecuta estos pasos en orden:
+
+            ### PASO 1: Análisis interno (sin usar herramientas aún)
+            Determina:
+            1. Categoría principal: bug | enhancement | question | documentation | invalid | wontfix
+            2. Área del juego (ninguna, una o varias): gameplay | ui | performance | scoring
+               - gameplay: mecánicas (rotación, colisiones, spawning, wall kicks, game over, piezas)
+               - ui: interfaz visual (canvas, overlays, colores, layout, responsividad, HUD)
+               - performance: rendimiento (game loop, animaciones, requestAnimationFrame, memoria)
+               - scoring: puntuación, niveles, líneas, velocidad de caída
+            3. Complejidad para implementar: low | medium | high
+            4. Archivos probablemente afectados: game.js | index.html | style.css (uno o más)
+
+            ### PASO 2: Crear labels personalizados si no existen
+            Ejecuta: gh label list --repo ${{ github.repository }} --json name --limit 100
+            Para cada uno de estos labels que NO aparezca en la lista, créalo:
+            - gh label create "gameplay"    --color "0e8a16" --description "Afecta mecánicas de juego"   --repo ${{ github.repository }} --force
+            - gh label create "ui"          --color "1d76db" --description "Afecta interfaz visual"      --repo ${{ github.repository }} --force
+            - gh label create "performance" --color "e4e669" --description "Afecta rendimiento"          --repo ${{ github.repository }} --force
+            - gh label create "scoring"     --color "d93f0b" --description "Afecta puntuación y niveles" --repo ${{ github.repository }} --force
+
+            ### PASO 3: Asignar labels al issue
+            Usa: gh issue edit ${{ github.event.issue.number }} --add-label "LABEL1,LABEL2" --repo ${{ github.repository }}
+            Reglas:
+            - Incluye SIEMPRE la categoría principal (bug/enhancement/question/etc.)
+            - Incluye los labels de área que apliquen
+            - Máximo 4 labels en total
+
+            ### PASO 4: Publicar comentario de diagnóstico
+            Usa: gh issue comment ${{ github.event.issue.number }} --repo ${{ github.repository }} --body "CONTENIDO"
+            El comentario debe tener esta estructura exacta en español:
+
+            ## Diagnóstico automatizado
+
+            **Categoría:** [bug|enhancement|question|documentation|invalid|wontfix]
+            **Área:** [gameplay|ui|performance|scoring|N/A]
+            **Complejidad estimada:** [Baja|Media|Alta]
+            **Archivos afectados:** [game.js, index.html, style.css — los que apliquen]
+
+            ### Análisis técnico
+            [2-4 oraciones con análisis técnico específico del código. Si es un bug, menciona la función donde probablemente ocurre (ej: tryRotate(), clearLines(), spawn()). Si es una mejora, describe qué parte del código habría que extender.]
+
+            ### Pasos sugeridos para implementar
+            1. [Paso concreto con referencia al archivo y función específica]
+            2. [Paso concreto]
+            3. [Paso adicional si aplica]
+
+            ### Archivos a revisar
+            - `game.js`: [qué revisar/modificar específicamente, o "No requiere cambios"]
+            - `index.html`: [qué revisar/modificar específicamente, o "No requiere cambios"]
+            - `style.css`: [qué revisar/modificar específicamente, o "No requiere cambios"]
+
+            ---
+            *Diagnóstico generado automáticamente por Claude para issue #${{ github.event.issue.number }}*
