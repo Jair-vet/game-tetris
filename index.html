@@ -5,6 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Tetris</title>
   <link rel="stylesheet" href="style.css" />
+  <script>
+    // Apply saved theme before render to avoid flash
+    (function () {
+      const saved = localStorage.getItem('tetris-theme');
+      if (saved === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    })();
+  </script>
 </head>
 <body>
   <div class="wrapper">
@@ -31,6 +38,17 @@
           <canvas id="next-canvas" width="120" height="120"></canvas>
         </div>
 
+        <div class="panel-section">
+          <div class="theme-toggle">
+            <span class="toggle-label">DARK</span>
+            <label class="toggle-switch" aria-label="Cambiar tema">
+              <input type="checkbox" id="theme-toggle" />
+              <span class="toggle-slider"></span>
+            </label>
+            <span class="toggle-label">LIGHT</span>
+          </div>
+        </div>
+
         <div class="panel-section controls">
           <span class="label">CONTROLS</span>
           <ul>
@@ -54,5 +72,24 @@
   </div>
 
   <script src="game.js"></script>
+  <script>
+    (function () {
+      const toggle = document.getElementById('theme-toggle');
+      const root = document.documentElement;
+
+      // Sync checkbox state with current theme
+      toggle.checked = root.getAttribute('data-theme') === 'light';
+
+      toggle.addEventListener('change', function () {
+        if (this.checked) {
+          root.setAttribute('data-theme', 'light');
+          localStorage.setItem('tetris-theme', 'light');
+        } else {
+          root.removeAttribute('data-theme');
+          localStorage.setItem('tetris-theme', 'dark');
+        }
+      });
+    })();
+  </script>
 </body>
 </html>
